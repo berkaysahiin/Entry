@@ -16,6 +16,7 @@
 
 # Debugger Files
 *.pdb
+gf2
 
 # Compiled Dynamic libraries
 *.so
@@ -39,3 +40,17 @@
 
 # debug information files
 *.dwo
+
+
+# Build dirs
+build/
+entry-build/
+
+# Caches
+entry-cache
+.cache/
+
+# Clang
+.clangd
+
+
