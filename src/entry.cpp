@@ -6,6 +6,7 @@
 #include "logging.hpp"
 #include "platform.hpp"
 #include "format.hpp"
+#include "nlohmann/json.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -32,7 +33,7 @@ ENTRY_NODISCARD std::vector<Path> GetDependencies(const Path& cacheDir, const Pa
 template<bool Recursive> 
 ENTRY_NODISCARD static std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions);
 
-int ExecuteCommand(const std::string& cmd);
+ENTRY_NODISCARD static int ExecuteCommand(const std::string& cmd);
 // End Forward declare static functions 
 
 // Begin Implement header
@@ -150,6 +151,66 @@ int Build(const Target& target)
     }
 
     return ExecuteCommand(link_cmd);
+}
+
+int ExportCompileCommands(const Target& target)
+{
+    using json = nlohmann::json;
+    
+    const Path buildDir = GetBuildDir();
+    EnsureDirectory(buildDir);
+
+    static constexpr std::string compiler = "clang++";
+    
+    const std::string common_flags = [&]() -> std::string
+    {
+        std::string common_flags;
+
+        for (const std::string& inc : target.includeDirs) 
+        {
+            common_flags += std::format(" -I{}", inc);
+        }
+
+        for (const std::string& flag : target.flags) 
+        {
+            common_flags += std::format(" {}", flag);
+        }
+
+        return common_flags;
+    }();
+
+    json compileCommands = json::array();
+
+    for (const Path& source : target.sources) {
+        const Path objectFile = GetObjectFile(buildDir, source);
+        
+        json entry;
+        entry["directory"] = std::filesystem::current_path().string();
+        entry["file"] = source.string();
+        entry["output"] = objectFile.string();
+        
+        std::string command = std::format("{} -c {}{} -o {}",
+            compiler,
+            source.string(),
+            common_flags,
+            objectFile.string());
+        
+        entry["command"] = command;
+        
+        compileCommands.push_back(entry);
+    }
+
+    Path outputPath = buildDir / "compile_commands.json";
+    std::ofstream outFile(outputPath);
+    if (!outFile.is_open()) {
+        ENTRY_ERRORLN("Failed to write compile_commands.json to {}", outputPath.string());
+        return 1;
+    }
+    
+    outFile << compileCommands.dump(2);
+    ENTRY_LOGLN("Exported compile_commands.json to {}", outputPath.string());
+    
+    return 0;
 }
 
 std::vector<std::string> CollectSources(const std::string& dir, const std::vector<std::string>& extensions) 

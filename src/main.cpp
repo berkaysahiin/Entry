@@ -19,6 +19,7 @@ int main(int argc, char* argv[])
     );
 
 	lua.set_function("build", &Lua_Build);
+	lua.set_function("export_compile_commands", &Lua_ExportCompileCommands);
 	lua.set_function("collect_sources", &Lua_CollectSourcesRecursive);
 	lua.set_function("collect_sources_recursive", &Lua_CollectSourcesRecursive);
 

@@ -13,6 +13,7 @@ add_executable(entry ${SOURCES})
 target_include_directories(entry PRIVATE include)
 
 target_include_directories(entry PRIVATE vendor)
+target_include_directories(entry PRIVATE vendor/json/single_include)
 
 # TODO: These shouldnt be necessary
 target_include_directories(entry PRIVATE /usr/include/lua5.4)

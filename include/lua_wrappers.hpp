@@ -5,6 +5,7 @@
 
 // Same as the original
 int Lua_Build(const Target& exe);
+int Lua_ExportCompileCommands(const Target& exe);
 
 // Same as originals except extensions are passed by value. const reference breaks it.
 // Okay to use like this until I figure out an elegant way to solve this
