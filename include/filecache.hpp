@@ -1,7 +1,5 @@
 #pragma once
 
-#include "compiler.hpp"
-
 #include <unordered_map>
 #include <filesystem>
 #include <string>

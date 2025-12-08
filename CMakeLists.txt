@@ -12,5 +12,12 @@ add_executable(entry ${SOURCES})
 
 target_include_directories(entry PRIVATE include)
 
+target_include_directories(entry PRIVATE vendor)
+
+# TODO: These shouldnt be necessary
+target_include_directories(entry PRIVATE /usr/include/lua5.4)
+
+target_link_libraries(entry PRIVATE lua5.4)
+
 # TODO: should be only in debug
-target_compile_definitions(entry PUBLIC ENTRY_VERBOSE)
+target_compile_definitions(entry PRIVATE ENTRY_VERBOSE)

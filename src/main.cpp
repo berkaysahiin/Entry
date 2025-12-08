@@ -1,34 +1,35 @@
-#include "entry.hpp" 
-#include <cstring>
-#include <filesystem>
+#include "lua_wrappers.hpp"
+#include "sol/sol.hpp" 
+
+#include <fstream>
 
 int main(int argc, char* argv[]) 
 {
-	ENTRY_LOGLN("Hello, World! This is entry");
+	sol::state lua;
+	lua.open_libraries(sol::lib::base, sol::lib::package);
 
-	const bool buildYourself = [&]() -> bool 
-	{
-		for(int i = 0; i < argc; i++)
-		{
-			if(strcmp(argv[i], "--build-yourself") == 0)
-			{
-				return true;
-			}
-		}
-		return false;
-	}();
+	lua.new_usertype<Target>("Target",
+        sol::constructors<Target()>(),
+        "name", &Target::name,
+        "cxx_flags", &Target::flags,
+        "libraries", &Target::libraries,
+		"sources", &Target::sources,
+		"include_dirs", &Target::includeDirs,
+		"library_dirs", &Target::libraryDirs
+    );
 
-	if(!buildYourself)
-		return 0;
+	lua.set_function("build", &Lua_Build);
+	lua.set_function("collect_sources", &Lua_CollectSourcesRecursive);
+	lua.set_function("collect_sources_recursive", &Lua_CollectSourcesRecursive);
 
-	// lets build entry with entry
-	Target entry {
-		.name = "entry",
-		.cxx_flags = {"-std=c++20" , "-g", "-DENTRY_VERBOSE"},
-		.sources = CollectSourcesRecursive("src"),
-		.include_dirs = {"include"},
-	};
+  	std::ifstream t("entry.lua");
+	std::stringstream buffer;
+	buffer << t.rdbuf();
+	std::string script = buffer.str();
 
-	return Build(entry);
+	lua.script(script);
+	std::cout << std::endl;
+
+	return 0;
 }
 

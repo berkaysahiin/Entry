@@ -30,7 +30,7 @@ ENTRY_NODISCARD static Path GetDepsFile(const Path& cacheDir, const Path& object
 ENTRY_NODISCARD std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile);
 
 template<bool Recursive> 
-ENTRY_NODISCARD static std::vector<Path> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions);
+ENTRY_NODISCARD static std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions);
 
 int ExecuteCommand(const std::string& cmd);
 // End Forward declare static functions 
@@ -57,12 +57,17 @@ int Build(const Target& target)
     const std::string common_flags = [&]() -> std::string
 	{
 		std::string common_flags;
-		for (const Path& inc : target.include_dirs) {
-			common_flags += std::format(" -I{}", inc.string());
+
+		for (const std::string& inc : target.includeDirs) 
+		{
+			common_flags += std::format(" -I{}", inc);
 		}
-			for (const std::string& flag : target.cxx_flags) {
-        	common_flags += std::format(" {}", flag);
+
+		for (const std::string& flag : target.flags) 
+		{
+			common_flags += std::format(" {}", flag);
     	}
+
 		return common_flags;
 	}();
 
@@ -136,8 +141,8 @@ int Build(const Target& target)
         link_cmd += std::format(" {}", obj.string());
     }
 
-    for (const Path& lib_dir : target.library_dirs) {
-        link_cmd += std::format(" -L{}", lib_dir.string());
+    for (const std::string& libDir : target.libraryDirs) {
+        link_cmd += std::format(" -L{}", libDir);
     }
 
     for (const std::string& library : target.libraries) {
@@ -147,14 +152,14 @@ int Build(const Target& target)
     return ExecuteCommand(link_cmd);
 }
 
-std::vector<Path> CollectSources(const Path& dir, const std::vector<std::string>& extensions) 
+std::vector<std::string> CollectSources(const std::string& dir, const std::vector<std::string>& extensions) 
 {
-    return CollectSourcesImpl<false>(dir, extensions);
+    return CollectSourcesImpl<false>(std::filesystem::path{ dir }, extensions);
 }
 
-std::vector<Path> CollectSourcesRecursive(const Path& dir, const std::vector<std::string>& extensions) 
+std::vector<std::string> CollectSourcesRecursive(const std::string& dir, const std::vector<std::string>& extensions) 
 {
-    return CollectSourcesImpl<true>(dir, extensions);
+    return CollectSourcesImpl<true>(std::filesystem::path{ dir }, extensions);
 }
 
 // End Implement header
@@ -257,7 +262,7 @@ std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile)
 }
 
 template<bool Recursive>
-std::vector<Path> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions) {
+std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions) {
 	namespace fs = std::filesystem;
     
     if (!fs::exists(dir) || !fs::is_directory(dir)) {
@@ -265,7 +270,7 @@ std::vector<Path> CollectSourcesImpl(const Path& dir, const std::vector<std::str
 		std::abort();
     }
 
-    std::vector<Path> result;
+    std::vector<std::string> result;
     
     using Iterator = std::conditional_t<Recursive, fs::recursive_directory_iterator, fs::directory_iterator>;
     
@@ -276,7 +281,7 @@ std::vector<Path> CollectSourcesImpl(const Path& dir, const std::vector<std::str
                 if (ext == allowed_ext) {
 					const fs::path sourcePath = dir.filename() / std::filesystem::relative(entry.path(), dir);
 					ENTRY_LOGLN("Source: {}", sourcePath.string());
-                    result.push_back(sourcePath);
+                    result.push_back(sourcePath.string());
                     break;
                 }
             }
