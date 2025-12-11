@@ -72,7 +72,7 @@ int Build(const Target& target)
 		return common_flags;
 	}();
 
-    for (const Path& source : target.sources) 
+    for (const std::string& source : target.sources) 
 	{
         const Path objectFile = GetObjectFile(buildDir, source);
         const Path depfile = GetDepsFile(cacheDir, objectFile);
@@ -82,28 +82,28 @@ int Build(const Target& target)
 
         if (!FileExistsCached(objectFile, fileCache)) {
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (no object file)", source.string());
+            ENTRY_LOGLN("Building: {} (no object file)", source);
         }
         else if (IsNewer(source, objectFile, fileCache)) {
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (source modified)", source.string());
+            ENTRY_LOGLN("Building: {} (source modified)", source);
         }
         else if (!FileExistsCached(depfile, fileCache)) {
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (no dependency file ({}))", source.string(), depfile.string());
+            ENTRY_LOGLN("Building: {} (no dependency file ({}))", source, depfile.string());
         }
         else if (IsAnyFileNewer(GetDependencies(cacheDir, objectFile), objectFile, fileCache)) {
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (dependency modified)", source.string());
+            ENTRY_LOGLN("Building: {} (dependency modified)", source);
         }
         else {
-            ENTRY_LOGLN("Skipping: {} (up to date)", source.string());
+            ENTRY_LOGLN("Skipping: {} (up to date)", source);
         }
 
         if (needsCompile) {
             std::string cmd = std::format("{} -c {} -MMD -MF {}{} -o {}",
                 compiler,
-                source.string(),
+                source,
                 depfile.string(),
                 common_flags,
                 objectFile.string());
@@ -181,17 +181,17 @@ int ExportCompileCommands(const Target& target)
 
     json compileCommands = json::array();
 
-    for (const Path& source : target.sources) {
+    for (const std::string& source : target.sources) {
         const Path objectFile = GetObjectFile(buildDir, source);
         
         json entry;
         entry["directory"] = std::filesystem::current_path().string();
-        entry["file"] = source.string();
+        entry["file"] = source;
         entry["output"] = objectFile.string();
         
         std::string command = std::format("{} -c {}{} -o {}",
             compiler,
-            source.string(),
+            source,
             common_flags,
             objectFile.string());
         

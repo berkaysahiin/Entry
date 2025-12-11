@@ -1,9 +1,10 @@
 #include "lua_wrappers.hpp"
-#include "sol/sol.hpp" 
+#include "compiler.hpp"
 
+#include "sol/sol.hpp" 
 #include <fstream>
 
-int main(int argc, char* argv[]) 
+int main(ENTRY_UNUSED int argc, ENTRY_UNUSED char* argv[]) 
 {
 	sol::state lua;
 	lua.open_libraries(sol::lib::base, sol::lib::package);
