@@ -1,15 +1,32 @@
-#include "filesystem_utils.hpp"
-#include "logging.hpp"
-#include <algorithm>
-#include <filesystem>
+#pragma once
 
-void EnsureDirectory(const std::filesystem::path &dir)
+#include "filecache.hpp"
+#include "compiler.hpp"
+#include "logging.hpp"
+
+#include <filesystem>
+#include <vector>
+
+namespace Entry 
+{
+	namespace fs = std::filesystem;
+
+	void EnsureDirectory(const std::filesystem::path &dir);
+	bool IsNewer(const fs::path& thisFile, const fs::path& otherFile, FileCache& cache); // is thisFile newer than other file
+	bool IsAnyFileNewer(const std::vector<fs::path>& theseFiles, const fs::path& otherFile, FileCache& cache); // is any of theseFiles newer than other file
+	bool FileExistsCached(const fs::path& file, FileCache& cache);
+	fs::file_time_type TimestampCached(const fs::path& file, FileCache& cache);
+}
+
+// --------------------------------------------------------------------------------------------------
+
+ENTRY_INLINE void Entry::EnsureDirectory(const std::filesystem::path &dir)
 {
 	if(!std::filesystem::exists(dir))
         std::filesystem::create_directories(dir);
 }
 
-bool IsNewer(const fs::path& thisFile, const fs::path& otherFile, FileCache& cache)
+ENTRY_INLINE bool Entry::IsNewer(const fs::path& thisFile, const fs::path& otherFile, FileCache& cache)
 {
 	const bool thisFileExists = FileExistsCached(thisFile, cache);
 
@@ -30,7 +47,7 @@ bool IsNewer(const fs::path& thisFile, const fs::path& otherFile, FileCache& cac
     return TimestampCached(thisFile, cache) > TimestampCached(otherFile, cache);
 }
 
-bool IsAnyFileNewer(const std::vector<fs::path>& theseFiles, const fs::path& otherFile, FileCache& cache)
+ENTRY_INLINE bool Entry::IsAnyFileNewer(const std::vector<fs::path>& theseFiles, const fs::path& otherFile, FileCache& cache)
 {
 	for(const auto& thisFile : theseFiles)
 	{
@@ -40,14 +57,13 @@ bool IsAnyFileNewer(const std::vector<fs::path>& theseFiles, const fs::path& oth
 	return false;
 }
 
-bool FileExistsCached(const fs::path& file, FileCache& cache) 
+ENTRY_INLINE bool Entry::FileExistsCached(const fs::path& file, FileCache& cache) 
 {
-    std::string key = file.string();
-
-	const bool hasTimeStamp = cache.timestamps.contains(key);
+    const auto& key = file.string();
+	const auto it = cache.timestamps.find(key);
     
 	// If has a timestamp, then it exists.
-    if (hasTimeStamp) 
+    if (it != nullptr) 
 	{
         return true;
     }
@@ -63,7 +79,7 @@ bool FileExistsCached(const fs::path& file, FileCache& cache)
     return exists;
 }
 
-fs::file_time_type TimestampCached(const fs::path& file, FileCache& cache) {
+ENTRY_INLINE Entry::fs::file_time_type Entry::TimestampCached(const fs::path& file, FileCache& cache) {
 	const bool exists = FileExistsCached(file, cache);
 
 	if(exists)

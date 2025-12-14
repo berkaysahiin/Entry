@@ -1,55 +1,59 @@
-#include "entry.hpp"
+#pragma once
 
 #include "compiler.hpp"
 #include "target.hpp"
-#include "filesystem_utils.hpp"
-#include "logging.hpp"
-#include "platform.hpp"
 #include "format.hpp"
-#include "nlohmann/json.hpp"
+#include "filesystem_utils.hpp"
+#include "platform.hpp"
+#include "logging.hpp"
 
-#include <algorithm>
-#include <cstdlib>
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <fstream>
 #include <future>
+#include <algorithm>
+#include <filesystem>
+#include <cstdlib>
+#include <fstream>
 
-static constexpr std::string_view CACHE_DIR = "entry-cache";
-static constexpr std::string_view BUILD_DIR = "entry-build";
+#include "nlohmann/json.hpp"
 
-// Just to avoid its long name...
-using Path = std::filesystem::path;
-
-// Begin Forward declare static functions 
-ENTRY_NODISCARD static Path GetCacheDir();
-ENTRY_NODISCARD static Path GetBuildDir();
-ENTRY_NODISCARD static Path GetObjectFile(const Path& buildDir, const Path& sourceFile);
-ENTRY_NODISCARD static Path GetDepsFile(const Path& cacheDir, const Path& objectFile);
-ENTRY_NODISCARD std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile);
-
-template<bool Recursive> 
-ENTRY_NODISCARD static std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions);
-
-ENTRY_NODISCARD static int ExecuteCommand(const std::string& cmd);
-// End Forward declare static functions 
-
-// Begin Implement header
-
-int Build(const Target& target) 
+namespace Entry 
 {
-    const Path buildDir = GetBuildDir();
-    const Path cacheDir = GetCacheDir();
+	namespace fs = std::filesystem;
 
-    EnsureDirectory(buildDir);
-    EnsureDirectory(cacheDir);
+	int Build(const Target& exe);
+	int ExportCompileCommands(const Target& target);
+	std::vector<fs::path> CollectSources(const fs::path& dir, const std::vector<std::string>& extensions);
+	std::vector<fs::path> CollectSourcesRecursive(const fs::path& dir, const std::vector<std::string>& extensions);
+}
 
-   	FileCache fileCache;
+namespace Entry::Detail
+{	
+	template<bool Recursive> 
+	std::vector<fs::path> CollectSourcesImpl(const fs::path& dir, const std::vector<std::string>& extensions);
 
-    static constexpr std::string compiler = "clang++";
-    std::vector<Path> objectFiles;
+	int ExecuteCommand(const std::string& cmd);
+	fs::path GetBuildDir();
+	fs::path GetObjectFile(const fs::path& buildDir, const fs::path& sourceFile);
+	fs::path GetDepsFile(const fs::path& buildDir, const fs::path& objectFile);
+	std::vector<fs::path> GetDependencies(const fs::path& buildDir, const fs::path& objectFile);
+
+	ENTRY_INLINE std::string g_entryDir = "entry-build";
+}
+
+// --------------------------------------------------------------------------------------------------
+
+ENTRY_INLINE int Entry::Build(const Entry::Target& target) 
+{
+    const fs::path buildDir = Detail::GetBuildDir();
+	EnsureDirectory(buildDir);
+
+   	static FileCache fileCache;
+
+    static constexpr std::string_view compiler = "clang++";
+
+    std::vector<fs::path> objectFiles;
     objectFiles.reserve(target.sources.size());
 
     std::vector<std::string> compileCommands;
@@ -59,51 +63,57 @@ int Build(const Target& target)
 	{
 		std::string common_flags;
 
-		for (const std::string& inc : target.includeDirs) 
+		for (const auto& inc : target.includeDirs) 
 		{
-			common_flags += std::format(" -I{}", inc);
+			common_flags += ENTRY_FORMAT(" -I{}", inc.string());
 		}
 
 		for (const std::string& flag : target.flags) 
 		{
-			common_flags += std::format(" {}", flag);
+			common_flags += ENTRY_FORMAT(" {}", flag);
     	}
 
 		return common_flags;
 	}();
 
-    for (const std::string& source : target.sources) 
+    for (const auto& source : target.sources) 
 	{
-        const Path objectFile = GetObjectFile(buildDir, source);
-        const Path depfile = GetDepsFile(cacheDir, objectFile);
+        const fs::path objectFile = Detail::GetObjectFile(buildDir, source);
+        const fs::path depfile = Detail::GetDepsFile(buildDir, objectFile);
         objectFiles.push_back(objectFile);
 
         bool needsCompile = false;
 
-        if (!FileExistsCached(objectFile, fileCache)) {
+        if (!FileExistsCached(objectFile, fileCache)) 
+		{
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (no object file)", source);
+            ENTRY_LOGLN("Building: {} (no object file)", source.string());
         }
-        else if (IsNewer(source, objectFile, fileCache)) {
+        else if (IsNewer(source, objectFile, fileCache)) 
+		{
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (source modified)", source);
+            ENTRY_LOGLN("Building: {} (source modified)", source.string());
         }
-        else if (!FileExistsCached(depfile, fileCache)) {
+        else if (!FileExistsCached(depfile, fileCache)) 
+		{
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (no dependency file ({}))", source, depfile.string());
+            ENTRY_LOGLN("Building: {} (no dependency file ({}))", source.string(), depfile.string());
         }
-        else if (IsAnyFileNewer(GetDependencies(cacheDir, objectFile), objectFile, fileCache)) {
+        else if (IsAnyFileNewer(Detail::GetDependencies(buildDir, objectFile), objectFile, fileCache)) 
+		{
             needsCompile = true;
-            ENTRY_LOGLN("Building: {} (dependency modified)", source);
+            ENTRY_LOGLN("Building: {} (dependency modified)", source.string());
         }
-        else {
-            ENTRY_LOGLN("Skipping: {} (up to date)", source);
+        else 
+		{
+            ENTRY_LOGLN("Skipping: {} (up to date)", source.string());
         }
 
-        if (needsCompile) {
-            std::string cmd = std::format("{} -c {} -MMD -MF {}{} -o {}",
+        if (needsCompile) 
+		{
+            std::string cmd = ENTRY_FORMAT("{} -c {} -MMD -MF {}{} -o {}",
                 compiler,
-                source,
+                source.string(),
                 depfile.string(),
                 common_flags,
                 objectFile.string());
@@ -111,12 +121,12 @@ int Build(const Target& target)
         }
     }
 
-    std::vector<std::future<int>> futures;
+	std::vector<std::future<int>> futures;
     futures.reserve(compileCommands.size());
 
     for (const std::string& cmd : compileCommands) {
         futures.push_back(std::async(std::launch::async, [cmd]() {
-            return ExecuteCommand(cmd);
+            return Detail::ExecuteCommand(cmd);
         }));
     }
 
@@ -133,31 +143,31 @@ int Build(const Target& target)
         exe_name += ".exe";
     }
 
-    Path exe_path = buildDir / exe_name;
+	fs::path exe_path = buildDir / exe_name;
 
     // TODO: Maybe move this to top so this is set waiting for future
     std::string link_cmd = std::format("{} -o {}", compiler, exe_path.string());
 
-    for (const Path& obj : objectFiles) {
+    for (const fs::path& obj : objectFiles) {
         link_cmd += std::format(" {}", obj.string());
     }
 
-    for (const std::string& libDir : target.libraryDirs) {
-        link_cmd += std::format(" -L{}", libDir);
+    for (const auto& libDir : target.libraryDirs) {
+        link_cmd += std::format(" -L{}", libDir.string());
     }
 
     for (const std::string& library : target.libraries) {
         link_cmd += std::format(" -l{}", library);
     }
 
-    return ExecuteCommand(link_cmd);
+    return Detail::ExecuteCommand(link_cmd);
 }
 
-int ExportCompileCommands(const Target& target)
+ENTRY_INLINE int Entry::ExportCompileCommands(const Target& target)
 {
     using json = nlohmann::json;
     
-    const Path buildDir = GetBuildDir();
+    const fs::path buildDir = Detail::GetBuildDir();
     EnsureDirectory(buildDir);
 
     static constexpr std::string compiler = "clang++";
@@ -166,9 +176,9 @@ int ExportCompileCommands(const Target& target)
     {
         std::string common_flags;
 
-        for (const std::string& inc : target.includeDirs) 
+        for (const auto& inc : target.includeDirs) 
         {
-            common_flags += std::format(" -I{}", inc);
+            common_flags += std::format(" -I{}", inc.string());
         }
 
         for (const std::string& flag : target.flags) 
@@ -181,8 +191,8 @@ int ExportCompileCommands(const Target& target)
 
     json compileCommands = json::array();
 
-    for (const std::string& source : target.sources) {
-        const Path objectFile = GetObjectFile(buildDir, source);
+    for (const auto& source : target.sources) {
+        const fs::path objectFile = Detail::GetObjectFile(buildDir, source);
         
         json entry;
         entry["directory"] = std::filesystem::current_path().string();
@@ -191,7 +201,7 @@ int ExportCompileCommands(const Target& target)
         
         std::string command = std::format("{} -c {}{} -o {}",
             compiler,
-            source,
+            source.string(),
             common_flags,
             objectFile.string());
         
@@ -200,7 +210,7 @@ int ExportCompileCommands(const Target& target)
         compileCommands.push_back(entry);
     }
 
-    Path outputPath = buildDir / "compile_commands.json";
+	fs::path outputPath = buildDir / "compile_commands.json";
     std::ofstream outFile(outputPath);
     if (!outFile.is_open()) {
         ENTRY_ERRORLN("Failed to write compile_commands.json to {}", outputPath.string());
@@ -213,32 +223,26 @@ int ExportCompileCommands(const Target& target)
     return 0;
 }
 
-std::vector<std::string> CollectSources(const std::string& dir, const std::vector<std::string>& extensions) 
+ENTRY_INLINE std::vector<Entry::fs::path> Entry::CollectSources(const fs::path& dir, const std::vector<std::string>& extensions) 
 {
-    return CollectSourcesImpl<false>(std::filesystem::path{ dir }, extensions);
+    return Detail::CollectSourcesImpl<false>(std::filesystem::path{ dir }, extensions);
 }
 
-std::vector<std::string> CollectSourcesRecursive(const std::string& dir, const std::vector<std::string>& extensions) 
+ENTRY_INLINE std::vector<Entry::fs::path> Entry::CollectSourcesRecursive(const fs::path& dir, const std::vector<std::string>& extensions) 
 {
-    return CollectSourcesImpl<true>(std::filesystem::path{ dir }, extensions);
+    return Detail::CollectSourcesImpl<true>(std::filesystem::path{ dir }, extensions);
 }
 
-// End Implement header
+// --------------------------------------------------------------------------------------------------
 
-// ------------------------------------------------------------------------------------------------------- // 
-
-Path GetCacheDir() 
-{
-	return Path(CACHE_DIR); 
-}
-Path GetBuildDir() 
+ENTRY_INLINE Entry::fs::path Entry::Detail::GetBuildDir() 
 { 
-	return Path(BUILD_DIR); 
+	return Entry::fs::path(Entry::Detail::g_entryDir); 
 }
 
-Path GetObjectFile(const Path& buildDir, const Path& sourceFile) 
+ENTRY_INLINE Entry::fs::path Entry::Detail::GetObjectFile(const Entry::fs::path& buildDir, const Entry::fs::path& sourceFile) 
 {
-    Path source = sourceFile;
+    Entry::fs::path source = sourceFile;
 
 	// To avoid being forced to duplicate directory tree hierarchy but still allow multiple source files with same name 
     std::string objectNameWithoutExtension = source.replace_extension().generic_string();
@@ -265,12 +269,12 @@ Path GetObjectFile(const Path& buildDir, const Path& sourceFile)
     return objectPath;
 }
 
-Path GetDepsFile(const Path& cacheDir, const Path& objectFile)
+ENTRY_INLINE Entry::fs::path Entry::Detail::GetDepsFile(const Entry::fs::path& cacheDir, const Entry::fs::path& objectFile)
 {
 	return cacheDir / (objectFile.stem().string() + ".d");
 }
 
-std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile) 
+ENTRY_INLINE std::vector<Entry::fs::path> Entry::Detail::GetDependencies(const Entry::fs::path& cacheDir, const Entry::fs::path& objectFile) 
 {
 	namespace fs = std::filesystem;
 
@@ -280,7 +284,7 @@ std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile)
 		std::abort();
     }
 
-	const Path depFile = GetDepsFile(cacheDir, objectFile);
+	const Entry::fs::path depFile = GetDepsFile(cacheDir, objectFile);
     
     if (!fs::exists(depFile)) {
 		ENTRY_ERRORLN("Cannot find dependencies. Dependency file {} does not exists.", depFile.string());
@@ -293,7 +297,7 @@ std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile)
 		std::abort();
     }
     
-    std::vector<Path> dependencies;
+    std::vector<Entry::fs::path> dependencies;
     std::string line;
     std::string content;
     
@@ -316,14 +320,14 @@ std::vector<Path> GetDependencies(const Path& cacheDir, const Path& objectFile)
     std::string dep;
     
     while (iss >> dep) {
-        dependencies.push_back(Path(dep));
+        dependencies.push_back(Entry::fs::path(dep));
     }
     
     return dependencies;
 }
 
 template<bool Recursive>
-std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<std::string>& extensions) {
+ENTRY_INLINE std::vector<Entry::fs::path> Entry::Detail::CollectSourcesImpl(const Entry::fs::path& dir, const std::vector<std::string>& extensions) {
 	namespace fs = std::filesystem;
     
     if (!fs::exists(dir) || !fs::is_directory(dir)) {
@@ -331,7 +335,7 @@ std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<s
 		std::abort();
     }
 
-    std::vector<std::string> result;
+    std::vector<fs::path> result;
     
     using Iterator = std::conditional_t<Recursive, fs::recursive_directory_iterator, fs::directory_iterator>;
     
@@ -352,7 +356,7 @@ std::vector<std::string> CollectSourcesImpl(const Path& dir, const std::vector<s
     return result;
 }
 
-int ExecuteCommand(const std::string& cmd)
+ENTRY_INLINE int Entry::Detail::ExecuteCommand(const std::string& cmd)
 {
     const int result = std::system(cmd.c_str());
     ENTRY_LOGLN("{}", cmd);

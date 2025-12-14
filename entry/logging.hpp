@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compiler.hpp"
 #include "format.hpp" // IWYU pragma: keep
 #include <iostream> // IWYU pragma: keep
 
@@ -12,12 +13,10 @@
 	#define ENTRY_ERROR(...)     ___ENTRY_PRINT(cerr, __VA_ARGS__)
 	#define ENTRY_ERRORLN(...) 	 ___ENTRY_PRINTLN(cerr, __VA_ARGS__)
 #else
-	#define UNUSED(...)
-
-	#define ENTRY_LOG(...)       UNUSED(__VA_ARGS__)  
-	#define ENTRY_LOGLN(...)     UNUSED(__VA_ARGS__)  
-	#define ENTRY_ERROR(...)     UNUSED(__VA_ARGS__)  
-	#define ENTRY_ERRORLN(...)   UNUSED(__VA_ARGS__)
+	#define ENTRY_LOG(...)       ENTRY_UNUSED(__VA_ARGS__)  
+	#define ENTRY_LOGLN(...)     ENTRY_UNUSED(__VA_ARGS__)  
+	#define ENTRY_ERROR(...)     ENTRY_UNUSED(__VA_ARGS__)  
+	#define ENTRY_ERRORLN(...)   ENTRY_UNUSED(__VA_ARGS__)
 #endif
 
 
