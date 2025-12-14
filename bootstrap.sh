@@ -5,7 +5,6 @@ STD="-std=c++20"
 CFLAGS="-Wall -Wextra -Werror -O0 -g"
 DEFINES="-DENTRY_VERBOSE"
 INCLUDES=""
-LIBS=""
 
 SOURCES="build.cpp"
 
