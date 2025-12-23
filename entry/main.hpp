@@ -1,6 +1,7 @@
 #pragma once
 
 #include "compiler.hpp"
+#include "debugging.hpp"
 #include "target.hpp"
 #include "format.hpp"
 #include "filesystem_utils.hpp"
@@ -25,7 +26,7 @@ namespace Entry
 	int Build(const Target& exe);
 	int ExportCompileCommands(const Target& target);
 	std::vector<fs::path> CollectSources(const fs::path& dir, const std::vector<std::string>& extensions);
-	std::vector<fs::path> CollectSourcesRecursive(const fs::path& dir, const std::vector<std::string>& extensions);
+	std::vector<fs::path> CollectSourcesRecursive(const fs::path& dir, const std::vector<std::string>& extensions = {".cpp"});
 }
 
 namespace Entry::Detail
@@ -46,6 +47,8 @@ namespace Entry::Detail
 
 ENTRY_INLINE int Entry::Build(const Entry::Target& target) 
 {
+	ENTRY_ASSERT(target.name != "", "Target must have name to name the output binary");
+
     const fs::path buildDir = Detail::GetBuildDir();
 	EnsureDirectory(buildDir);
 
@@ -344,7 +347,7 @@ ENTRY_INLINE std::vector<Entry::fs::path> Entry::Detail::CollectSourcesImpl(cons
             std::string ext = entry.path().extension().string();
             for (const std::string& allowed_ext : extensions) {
                 if (ext == allowed_ext) {
-					const fs::path sourcePath = dir.filename() / std::filesystem::relative(entry.path(), dir);
+					const fs::path sourcePath = entry.path();
 					ENTRY_LOGLN("Source: {}", sourcePath.string());
                     result.push_back(sourcePath.string());
                     break;
@@ -359,6 +362,8 @@ ENTRY_INLINE std::vector<Entry::fs::path> Entry::Detail::CollectSourcesImpl(cons
 ENTRY_INLINE int Entry::Detail::ExecuteCommand(const std::string& cmd)
 {
     const int result = std::system(cmd.c_str());
+    ENTRY_LOGLN("--------------------------------------------");
     ENTRY_LOGLN("{}", cmd);
+    ENTRY_LOGLN("--------------------------------------------");
 	return result;
 }

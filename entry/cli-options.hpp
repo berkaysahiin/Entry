@@ -3,6 +3,7 @@
 #include "compiler.hpp"
 #include "debugging.hpp"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -10,6 +11,8 @@
 namespace Entry
 {
 	std::string_view GetOptionString(std::string_view name);
+	std::string_view GetOptionStringOr(std::string_view name, std::string_view defaultOpt);
+	std::optional<std::string_view> MaybeGetOptionString(std::string_view name);
 	bool GetOptionBool(std::string_view name);
 	int GetOptionInt(std::string_view name);
 }
@@ -33,6 +36,29 @@ ENTRY_INLINE std::string_view Entry::GetOptionString(std::string_view name)
 {
 	const auto it  = Entry::Detail::g_optionStore.options.find(name.data());
 	ENTRY_ASSERT(it != nullptr, "Option with name \"{}\" doesn't exist", name);
+	return it->second;
+}
+
+ENTRY_INLINE std::string_view Entry::GetOptionStringOr(std::string_view name, std::string_view defaultOpt)
+{
+	const auto it  = Entry::Detail::g_optionStore.options.find(name.data());
+	if(it == Entry::Detail::g_optionStore.options.end())
+	{
+		return defaultOpt;
+	}
+
+	return it->second;
+}
+
+ENTRY_INLINE std::optional<std::string_view> Entry::MaybeGetOptionString(std::string_view name)
+{
+	const auto it  = Entry::Detail::g_optionStore.options.find(name.data());
+	if(it == Entry::Detail::g_optionStore.options.end())
+	{
+		// Return nullopt
+		return {};
+	}
+
 	return it->second;
 }
 
